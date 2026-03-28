@@ -15,10 +15,10 @@ and validation.
 
 | Phase | Status | Commit | Notes |
 |-------|--------|--------|-------|
-| 1 — Project Scaffolding | 🟡 | | package.json, .gitignore, test-all.js config, initial commit |
-| 2 — Core Skill Files | ⬚ | | Extract SKILL.md, generate.js, reference.md from plan |
-| 3 — Offline Validation | ⬚ | | Test script for arg parsing, help flag, error paths |
-| 4 — Game Asset Enhancements | ⬚ | | Game workflows, asset defaults, sprite sheets |
+| 1 — Project Scaffolding | ✅ Done | `37f9bb5` | package.json, .gitignore, test-all.js config, initial commit |
+| 2 — Core Skill Files | ✅ Done | `da342fd` | SKILL.md, generate.cjs, reference.md extracted |
+| 3 — Offline Validation | ✅ Done | `1dd7488` | 12 test cases, all passing |
+| 4 — Game Asset Enhancements | ✅ Done | `da342fd` | Already included in Phase 2 extraction |
 
 ## Phase 1 — Project Scaffolding
 
