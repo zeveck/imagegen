@@ -3,7 +3,7 @@ name: chatgpt-imagegen
 description: Generate images using OpenAI's gpt-image-1 model. Ideal for game assets (sprites, tiles, UI elements, icons), concept art, and placeholder graphics. Supports iteration — "try again", "make it bluer", "go back to v1".
 disable-model-invocation: true
 allowed-tools: Bash(node */generate.cjs *)
-argument-hint: <description of image to generate>
+argument-hint: <description> [size: 1024x1024|1536x1024|1024x1536] [quality: low|medium|high] [transparent] [format: png|webp|jpg]
 ---
 
 # Image Generation with gpt-image-1

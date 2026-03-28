@@ -12,6 +12,9 @@
 
 "use strict";
 
+// Load .env file if present (Node 20.12+ built-in, no dependencies)
+try { process.loadEnvFile(); } catch {}
+
 const fs = require("fs");
 const path = require("path");
 

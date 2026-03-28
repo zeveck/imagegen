@@ -103,6 +103,45 @@ Variations:
 > "Bright cheerful style, rounded shapes, thick outlines, high contrast,
 > mobile-friendly clarity"
 
+### Tactics / SRPG Sub-Styles
+
+**FFT / Yoshida Style** (Final Fantasy Tactics, Tactics Ogre)
+> "Isometric tactical RPG, chibi pixel art sprites with 1:2 head-to-body
+> ratio, muted earth-tone palette — aged parchment beiges, warm ambers,
+> olive greens, dusty browns, slate blues. Dark grey outlines (#282828),
+> medieval manuscript aesthetic, pencil hatching with warm watercolor tones,
+> diamond tile grid, diorama quality"
+
+**Tactics Ogre / Dark Tactics** (grittier variant)
+> "Dark medieval isometric tactical RPG, pixel art with semi-realistic
+> proportions, somber muted palette — dark browns, deep purples, charcoal
+> greys, blood reds, cold blues. Political war drama aesthetic, limited
+> color index, gritty fantasy, pencil etching with CG coloring"
+
+**Shining Force / Classic 16-bit SRPG**
+> "16-bit Genesis SRPG style, bright saturated pixel art, angled 3/4
+> top-down view, vivid colorful palette, heroic adventure aesthetic,
+> anime-influenced character design, tile-based terrain, clean readable
+> sprites with bold outlines"
+
+**Fire Emblem GBA**
+> "GBA pixel art tactical RPG, top-down grid view, 16-color sprite
+> palette, clean readable faction-colored units (blue player, red enemy),
+> dark grey outlines (#282828), anime character portraits, snappy
+> proportions, strategic clarity"
+
+**Disgaea / Anime Tactics**
+> "Anime chibi SRPG, extreme super-deformed proportions with oversized
+> heads, vivid saturated high-contrast neon colors, 2D hand-drawn sprites
+> on isometric terrain, exaggerated anime eyes and hair, comedic fantasy
+> aesthetic, bright and energetic"
+
+**HD-2D / Modern Tactics** (Triangle Strategy, Octopath Traveler)
+> "HD-2D style, pixel art sprites in 3D environment, tilt-shift diorama
+> effect with depth-of-field bokeh blur, volumetric lighting, SNES-inspired
+> pixel characters on detailed terrain, dynamic shadows, warm atmospheric
+> lighting, retro-modern hybrid, miniature diorama aesthetic"
+
 ### Palette Suggestions by Theme
 
 | Theme | Palette Description |

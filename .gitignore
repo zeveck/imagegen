@@ -3,7 +3,10 @@
 .env.local
 node_modules/
 generated-images/
+assets/
 .claude/logs/
+.claude/worktrees/
+.test-results.txt
 .DS_Store
 Thumbs.db
 zskills/
