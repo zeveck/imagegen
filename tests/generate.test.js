@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.resolve(__dirname, '../.claude/skills/chatgpt-imagegen/generate.cjs');
+const SCRIPT = path.resolve(__dirname, '../.claude/skills/imagegen/generate.cjs');
 
 let passed = 0;
 let failed = 0;

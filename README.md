@@ -27,18 +27,23 @@ Zero external dependencies. Just Node.js and an API key.
 
 ### 2. Install
 
-Copy `generate.cjs` anywhere in your project:
+You can probably just ask your agent to install the skill from
+`github.com/zeveck/imagegen`.
+
+Manual install:
 
 ```bash
-# Standalone — just the CLI tool
-curl -o generate.cjs https://raw.githubusercontent.com/zeveck/imagegen/main/.claude/skills/chatgpt-imagegen/generate.cjs
+mkdir -p .claude/skills/imagegen
+cd .claude/skills/imagegen
+curl -O https://raw.githubusercontent.com/zeveck/imagegen/main/.claude/skills/imagegen/SKILL.md
+curl -O https://raw.githubusercontent.com/zeveck/imagegen/main/.claude/skills/imagegen/generate.cjs
+curl -O https://raw.githubusercontent.com/zeveck/imagegen/main/.claude/skills/imagegen/reference.md
 ```
 
-For the full Claude Code skill (with style presets and iteration support):
+Or just grab the CLI tool standalone:
 
 ```bash
-mkdir -p .claude/skills/chatgpt-imagegen
-# Copy SKILL.md, generate.cjs, and reference.md into that directory
+curl -o generate.cjs https://raw.githubusercontent.com/zeveck/imagegen/main/.claude/skills/imagegen/generate.cjs
 ```
 
 ### 3. Set Your API Key
@@ -156,7 +161,7 @@ Fantasy Forest, Dungeon/Dark, Ocean/Water, Desert/Arid, Cyberpunk,
 Cozy/Wholesome, Horror
 
 See
-[reference.md](.claude/skills/chatgpt-imagegen/reference.md)
+[reference.md](.claude/skills/imagegen/reference.md)
 for the full preset library with prompt text you can customize.
 
 ## Asset Organization
@@ -191,7 +196,7 @@ Claude Code agents:
   env:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   run: |
-    node .claude/skills/chatgpt-imagegen/generate.cjs \
+    node .claude/skills/imagegen/generate.cjs \
       --prompt "A pixel art sword, transparent background" \
       --output "./assets/items/sword.png" \
       --quality medium \
@@ -201,7 +206,7 @@ Claude Code agents:
 ## What's in the Repo
 
 ```
-.claude/skills/chatgpt-imagegen/
+.claude/skills/imagegen/
   generate.cjs      The CLI tool — works standalone, no dependencies
   SKILL.md          Claude Code skill definition (optional)
   reference.md      Style presets, prompt templates, cost tables

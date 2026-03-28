@@ -69,7 +69,7 @@ function hasChangedSourceFiles() {
       .filter(f => f.length > 0);
 
     const sourceFiles = allChanged.filter(f =>
-      (f.startsWith('.claude/skills/chatgpt-imagegen/') || f.startsWith('tests/')) &&
+      (f.startsWith('.claude/skills/imagegen/') || f.startsWith('tests/')) &&
       (f.endsWith('.js') || f.endsWith('.cjs') || f.endsWith('.md'))
     );
 

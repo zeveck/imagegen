@@ -1,6 +1,6 @@
 # Image Generation Reference
 
-Supplementary reference for the chatgpt-imagegen skill. Contains style presets,
+Supplementary reference for the imagegen skill. Contains style presets,
 prompt templates, cost estimates, and advanced tips.
 
 ---

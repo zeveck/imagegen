@@ -1,5 +1,5 @@
 ---
-name: chatgpt-imagegen
+name: imagegen
 description: Generate images using OpenAI's gpt-image-1 model. Ideal for game assets (sprites, tiles, UI elements, icons), concept art, and placeholder graphics. Supports iteration — "try again", "make it bluer", "go back to v1".
 disable-model-invocation: true
 allowed-tools: Bash(node */generate.cjs *)
@@ -25,7 +25,7 @@ to familiarize yourself with available style presets and cost estimates.
 ## Quick Start
 
 ```bash
-node .claude/skills/chatgpt-imagegen/generate.cjs \
+node .claude/skills/imagegen/generate.cjs \
   --prompt "A 32x32 pixel art treasure chest, gold coins spilling out, transparent background" \
   --output "./assets/items/treasure-chest.png" \
   --quality medium \
@@ -358,5 +358,5 @@ The API generates single images, not sprite sheets. For animation:
 ## Script Location
 
 ```bash
-node .claude/skills/chatgpt-imagegen/generate.cjs --prompt "..." --output "..." [options]
+node .claude/skills/imagegen/generate.cjs --prompt "..." --output "..." [options]
 ```
