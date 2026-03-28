@@ -16,12 +16,14 @@ Zero external dependencies. Just Node.js and an API key.
 
 1. Sign up at [platform.openai.com](https://platform.openai.com)
 2. **Add billing** — Settings > Billing. Minimum $5 in prepaid credits.
-3. **Verify your organization** — Settings > Organization > General.
-   Required for `gpt-image-1` access (not for the key itself). Requires a
-   government-issued photo ID. Takes 15–30 minutes.
-4. **Create a key** —
+3. **Create a key** —
    [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
-   Create the key *after* verification. Copy it immediately.
+   Copy it immediately.
+
+> If you get a 403 error when generating, you may need to
+> [verify your organization](https://platform.openai.com/settings/organization/general)
+> (photo ID, ~15 minutes). This was previously required for `gpt-image-1`
+> but may no longer be necessary for all accounts.
 
 ### 2. Install
 
