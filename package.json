@@ -1,0 +1,11 @@
+{
+  "name": "openai-imagegen",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Claude Code skill for image generation via OpenAI gpt-image-1",
+  "scripts": {
+    "test": "echo \"Tests not yet configured\" && exit 0",
+    "test:all": "node scripts/test-all.js"
+  }
+}

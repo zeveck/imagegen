@@ -1,0 +1,9 @@
+.imagegen-history.jsonl
+.env
+.env.local
+node_modules/
+generated-images/
+.claude/logs/
+.DS_Store
+Thumbs.db
+zskills/
