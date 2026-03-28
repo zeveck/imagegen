@@ -1,4 +1,4 @@
-# imagegen — Game Art Generation via OpenAI gpt-image-1
+# imagegen — Classic game art generation
 
 Generate game assets from your terminal or AI agent — sprites, tiles, UI
 elements, portraits, concept art — using OpenAI's `gpt-image-1` model.
