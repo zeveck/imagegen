@@ -319,6 +319,42 @@ When the user says "I like v2" or "that one's perfect":
   because their game code references `warrior.png`), copy/rename it and confirm.
 - Offer cleanup: "Want me to delete the other versions, or keep them?"
 
+## Game Asset Workflows
+
+### Consistency Across Assets
+
+When generating multiple related assets (e.g., a character sprite set, a
+tileset, a set of item icons):
+
+1. **Establish a style reference first.** Generate one "hero" asset and note
+   the exact prompt that produced a good result.
+2. **Reuse the style description verbatim** for subsequent assets. Change only
+   the subject matter.
+3. **Use the same quality/size settings** across related assets.
+4. **Maintain a consistent color palette.** State specific colors in prompts:
+   "using colors #3A7D44, #F2C94C, #EB5757" rather than "colorful".
+
+### Sprite Sheets and Animation Frames
+
+The API generates single images, not sprite sheets. For animation:
+
+1. Generate each frame individually with explicit pose descriptions.
+2. Use identical style descriptions and size for all frames.
+3. Name files sequentially: `player-walk-01.png`, `player-walk-02.png`, etc.
+4. The user or their tools will assemble frames into a sprite sheet.
+
+### Asset Type Defaults
+
+| Asset Type | Suggested Size | Quality | Background |
+|------------|---------------|---------|------------|
+| Sprites/Characters | 1024x1024 | medium | transparent |
+| Tiles | 1024x1024 | medium | opaque |
+| Items/Icons | 1024x1024 | low or medium | transparent |
+| UI Elements | 1024x1024 | medium | transparent |
+| Backgrounds | 1536x1024 | high | opaque |
+| Portraits | 1024x1536 | high | opaque or transparent |
+| Concept Art | 1536x1024 | high | opaque |
+
 ## Script Location
 
 ```bash
