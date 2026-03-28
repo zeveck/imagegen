@@ -15,7 +15,7 @@ import { createConnection } from 'node:net';
 import { getPort } from './port.js';
 
 // ─── CONFIGURE: set your test commands ───────────────────────────────
-const UNIT_TEST_CMD = 'echo "Unit tests pending Phase 3"';
+const UNIT_TEST_CMD = 'node tests/generate.test.js';
 const E2E_TEST_CMD = 'echo "E2E tests not applicable for this project"';
 const BUILD_TEST_CMD = 'echo "Build tests not applicable for this project"';
 
