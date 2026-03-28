@@ -1,12 +1,12 @@
-# /imagegen — Game Art Generation Skill for Claude Code
+# imagegen — Game Art Generation via OpenAI gpt-image-1
 
-Generate game assets from your terminal — sprites, tiles, UI elements,
-portraits, concept art — using Claude Code and OpenAI's `gpt-image-1` model.
+Generate game assets from your terminal or AI agent — sprites, tiles, UI
+elements, portraits, concept art — using OpenAI's `gpt-image-1` model.
 
-Claude acts as your art director: composing prompts from built-in style
-presets, choosing the right parameters, organizing output into asset
-directories, and managing an iteration loop so you can say "try again" or
-"make it bluer" until it's right.
+At its core, `generate.cjs` is a zero-dependency Node.js CLI tool that any
+script, agent, or CI pipeline can call directly. It also ships as a Claude
+Code skill (`/imagegen`) with built-in style presets, iteration support, and
+asset organization — but the CLI works anywhere Node.js runs.
 
 Zero external dependencies. Just Node.js and an API key.
 
@@ -22,18 +22,21 @@ Zero external dependencies. Just Node.js and an API key.
    [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
    Copy it immediately.
 
-### 2. Install the Skill
+### 2. Install
 
-Copy the skill into your project:
+Copy `generate.cjs` anywhere in your project:
+
+```bash
+# Standalone — just the CLI tool
+curl -o generate.cjs https://raw.githubusercontent.com/zeveck/imagegen/main/.claude/skills/chatgpt-imagegen/generate.cjs
+```
+
+For the full Claude Code skill (with style presets and iteration support):
 
 ```bash
 mkdir -p .claude/skills/chatgpt-imagegen
-cp -r path/to/imagegen/.claude/skills/chatgpt-imagegen/* .claude/skills/chatgpt-imagegen/
+# Copy SKILL.md, generate.cjs, and reference.md into that directory
 ```
-
-Or clone this repo and copy the three files from
-`.claude/skills/chatgpt-imagegen/` — `SKILL.md`, `generate.cjs`, and
-`reference.md`.
 
 ### 3. Set Your API Key
 
@@ -54,8 +57,17 @@ environment variable in your shell.
 
 ## Usage
 
-Describe what you want. Mention style, size, quality, or transparency
-naturally — Claude picks the right parameters.
+### CLI (any agent, script, or terminal)
+
+```bash
+node generate.cjs --prompt "A pixel art sword" --output "./sword.png"
+node generate.cjs --prompt "Forest scene" --output "./bg.png" --size 1536x1024 --quality high
+node generate.cjs --prompt "Game icon" --output "./icon.png" --background transparent
+```
+
+### Claude Code Skill
+
+With the skill installed, describe what you want naturally:
 
 ```
 /imagegen a 16-bit RPG snake sprite, transparent background
@@ -183,12 +195,12 @@ Claude Code agents:
       --background transparent
 ```
 
-## Skill Files
+## What's in the Repo
 
 ```
 .claude/skills/chatgpt-imagegen/
-  SKILL.md          Orchestration instructions for Claude
-  generate.cjs      Node.js API wrapper — the only executable
+  generate.cjs      The CLI tool — works standalone, no dependencies
+  SKILL.md          Claude Code skill definition (optional)
   reference.md      Style presets, prompt templates, cost tables
 ```
 
