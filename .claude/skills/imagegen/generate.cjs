@@ -12,11 +12,32 @@
 
 "use strict";
 
-// Load .env file if present (Node 20.12+ built-in, no dependencies)
-try { process.loadEnvFile(); } catch {}
-
 const fs = require("fs");
 const path = require("path");
+
+// Load .env file if present (Node 20.12+ built-in, no dependencies).
+// Search cwd first, then walk up from the script's own directory so the
+// skill works regardless of where it's invoked from (worktrees, subdirs).
+(function loadEnv() {
+  const tried = new Set();
+  const candidates = [process.cwd()];
+  let dir = __dirname;
+  while (dir && dir !== path.dirname(dir)) {
+    candidates.push(dir);
+    dir = path.dirname(dir);
+  }
+  for (const d of candidates) {
+    const p = path.join(d, ".env");
+    if (tried.has(p)) continue;
+    tried.add(p);
+    try {
+      if (fs.existsSync(p)) {
+        process.loadEnvFile(p);
+        return;
+      }
+    } catch {}
+  }
+})();
 
 // ---------------------------------------------------------------------------
 // Early --help check (before argument parsing, so it works with any flags)
