@@ -3,7 +3,7 @@ name: imagegen
 description: Generate images using OpenAI's gpt-image-1 model. Ideal for game assets (sprites, tiles, UI elements, icons), concept art, and placeholder graphics. Supports iteration — "try again", "make it bluer", "go back to v1".
 disable-model-invocation: false
 allowed-tools: Bash(node */generate.cjs *)
-argument-hint: <description> [size: 1024x1024|1536x1024|1024x1536] [quality: low|medium|high] [transparent] [format: png|webp|jpg]
+argument-hint: <description> [--image path] [size: 1024x1024|1536x1024|1024x1536] [quality: low|medium|high] [transparent] [format: png|webp|jpg]
 ---
 
 # Image Generation with gpt-image-1
@@ -48,6 +48,9 @@ if it's a game project, suggest sprites, tiles, or UI elements).
 | `--quality` | `low`, `medium`, `high`, `auto` | `medium` | `low` for iteration; `high` for finals |
 | `--background` | `transparent`, `opaque`, `auto` | `auto` | `transparent` for sprites, items, UI |
 | `--model` | `gpt-image-1` | `gpt-image-1` | Model to use |
+| `--image` | File path (repeatable, max 16) | — | Reference image for editing. Triggers `/v1/images/edits`. |
+| `--mask` | PNG file path | — | Alpha mask for inpainting (transparent = edit zone). Requires `--image`. |
+| `--input-fidelity` | `high`, `low` | `low` | How closely to preserve first input image. `high` = more faithful. |
 | `--history-id` | String (optional) | auto from path | Override the auto-derived history ID |
 | `--history-parent` | String (optional) | — | Parent generation ID (for iterations) |
 | `--no-history` | Flag (optional) | — | Disable history logging for this generation |
@@ -91,6 +94,119 @@ highlights, white clothing). This is a documented API bug.
 
 See [reference.md](reference.md) for style preset suggestions you can adapt.
 
+## Resolving Image References
+
+The `--image` flag requires a resolved file path. Users often reference images
+loosely — by filename fragment, description, or conversational shorthand. You
+must resolve these to actual paths before invoking the script.
+
+### User provides a filename or fragment
+
+> "use foo.jpg", "the barbarian sprite", "that player-idle image"
+
+1. Search the project: glob for the filename (`**/*foo*`, `**/*barbarian*`)
+2. Search `.imagegen-history.jsonl`: `grep -i "barbarian" .imagegen-history.jsonl`
+3. Scan `assets/` subdirectories
+4. If **one match** → use it. If **multiple** → ask which one. If **none** →
+   tell the user and ask for clarification.
+
+### User provides a path
+
+> "assets/sprites/barbarian.png"
+
+Verify the file exists. If not, search for close matches (typos, wrong
+directory). Resolve relative to the project root.
+
+### User describes an asset without a path
+
+> "the barbarian image", "that enemy we made earlier", "use our existing logo"
+
+1. Search `.imagegen-history.jsonl` for matching prompts/IDs:
+   `grep -i "barbarian" .imagegen-history.jsonl`
+2. Search asset directories: glob for `assets/**/*barbarian*`
+3. Check conversation context for recently generated images
+4. If found → use it. If ambiguous → ask.
+
+### User says "that one" / "the last one"
+
+Use the most recent generation from conversation context. If not in context,
+check the last entry in `.imagegen-history.jsonl`.
+
+**Key rule:** Never pass an unverified path to `--image`. Always confirm the
+file exists before invoking the script.
+
+## Reference Images & Editing
+
+When the user wants to edit, modify, or use an existing image as a style
+reference, pass it via `--image`. This switches the script from the
+`/v1/images/generations` endpoint to `/v1/images/edits`.
+
+### When to use `--image`
+
+**Primary signal:** The user mentions or provides a path to an existing image
+file alongside a generation request. This is the most common trigger.
+
+Other signals:
+- "edit this", "modify this image", "update the background"
+- "like this one", "match the style of", "based on"
+- "make it [bluer/darker/bigger]" when referring to an existing file (not just
+  a previous generation prompt)
+- "use [filename] as reference"
+
+**When NOT to use `--image`:** If the user just wants a prompt adjustment
+("make it face left") and there is no existing image file to feed in, use pure
+generation with a modified prompt instead.
+
+### `--input-fidelity` guidance
+
+| Value | When to use | Example |
+|-------|-------------|---------|
+| `low` (default) | Loose style reference, significant changes | "Create new icons matching the style of ref.png" |
+| `high` | Preserve specific details — faces, logos, textures | "Recolor this character from blue to red" |
+
+`high` fidelity preserves the **first** `--image` with extra richness. Place
+the most important reference image first when using multiple `--image` flags.
+
+### `--mask` for inpainting
+
+Use `--mask` when the user wants to edit only a specific region:
+- "replace just the sword with an axe"
+- "change the background but keep the character"
+- "remove the text in the corner"
+
+The mask must be a **PNG with an alpha channel**. Fully transparent areas mark
+the regions to edit; opaque areas are preserved. The mask must match the
+dimensions of the first input image.
+
+### Multiple reference images
+
+Pass up to 16 images to guide style consistency:
+```bash
+node .claude/skills/imagegen/generate.cjs \
+  --prompt "A potion bottle in the same style as these items" \
+  --output "./assets/items/potion.png" \
+  --image "./assets/items/sword.png" \
+  --image "./assets/items/shield.png" \
+  --input-fidelity low
+```
+
+### Chaining edits
+
+The output of one edit can become the `--image` for the next. This enables
+iterative refinement using the actual generated image (not just the prompt):
+```bash
+# First: generate base image
+node .claude/skills/imagegen/generate.cjs \
+  --prompt "A warrior character" --output "./assets/sprites/warrior.png"
+
+# Then: edit the generated image
+node .claude/skills/imagegen/generate.cjs \
+  --prompt "Add a red cape flowing behind the warrior" \
+  --output "./assets/sprites/warrior-v2.png" \
+  --image "./assets/sprites/warrior.png" \
+  --input-fidelity high
+```
+
 ## Output Organization
 
 Organize generated images by asset type:
@@ -120,7 +236,7 @@ Use descriptive filenames: `player-idle.png`, `grass-tile-01.png`,
 
 **NEVER combine `--background transparent` with JPEG output.** JPEG does not
 support transparency. Always use `.png` or `.webp` for transparent images. The
-script will warn and switch to PNG if you try.
+script will reject this combination with an error.
 
 **Always quote the `--output` and `--prompt` values** in the command to handle
 spaces and special characters correctly.
@@ -133,15 +249,12 @@ to replace the original `warrior.png` with this version?"
 
 ## Confirmation Policy
 
-- **First generation in this conversation**: Tell the user you will call the
-  OpenAI image API, what prompt you plan to use, and the estimated cost. Ask
-  for confirmation.
-- **Subsequent generations**: Proceed without confirmation unless the estimated
-  cost exceeds $0.50 (e.g., multiple high-quality HD images).
-- **Simple retries and adjustments**: No confirmation needed — the user explicitly
-  asked. Just proceed.
-- **Batch operations** (3+ images): Always summarize the plan and estimated total
-  cost before proceeding.
+**Do not ask for confirmation.** The user invoked `/imagegen` — just generate.
+Mention the estimated cost in your pre-generation message so the user can
+cancel if needed, but do not wait for approval.
+
+- **Batch operations** (3+ images): Summarize the plan and estimated total
+  cost before proceeding, since batches can add up.
 
 **Timing**: Image generation typically takes 10-30 seconds per image. Tell the
 user to expect a brief wait before invoking the script (e.g., "Generating now —
@@ -194,7 +307,9 @@ Classify each user request:
 | **New generation** | New subject matter, no reference to previous images | Generate fresh. |
 | **Simple retry** | "try again", "regenerate", "another version", "one more" | Reuse the exact same prompt and params. Increment version. |
 | **Adjustment** | "make it more [X]", "remove the [Y]", "change [Z] to [W]" | Take the previous prompt, apply the modification, increment version. |
+| **Edit existing** | "edit this image", "modify the colors", references a file | Use `--image` with the existing file. Edits the actual image, not just the prompt. |
 | **Reference-based** | "I liked the first one", "go back to v1", "use the robot style" | Look up the referenced generation (from context or history file), apply changes. |
+| **Style transfer** | "make new icons matching this style", "like this one" | Use `--image` with `--input-fidelity low` for loose style reference. |
 | **Batch variants** | "generate 3 versions", "give me some options" | Generate N variants with the same/varied prompts. |
 
 When in doubt, ask: "Would you like me to iterate on the previous [concept]

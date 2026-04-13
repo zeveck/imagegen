@@ -85,6 +85,44 @@ With the skill installed, describe what you want naturally:
 /imagegen 3 potion bottle variants, low quality
 ```
 
+### Reference Images
+
+You can pass existing images as references — the skill automatically uses
+OpenAI's image editing endpoint to incorporate them:
+
+```
+/imagegen a 16-bit version of the skeleton image in our repo
+/imagegen make new item icons matching the style of sword.png
+/imagegen edit the warrior sprite to add a red cape
+```
+
+Just describe what you want and mention the image. The skill finds the file,
+picks the right endpoint and fidelity settings, and generates.
+
+| Input photo | Generated 16-bit pixel art |
+|:-----------:|:--------------------------:|
+| <img src="examples/skeleton-photo.jpg" height="400"> | <img src="examples/skeleton-16bit.png" height="400"> |
+
+CLI equivalent:
+
+```bash
+node generate.cjs \
+  --prompt "16-bit SNES-era pixel art rendition of this skeleton..." \
+  --output "./skeleton-16bit.png" \
+  --image "./skeleton-photo.jpg" \
+  --input-fidelity low \
+  --size 1024x1536 \
+  --quality medium
+```
+
+Reference image parameters:
+
+| Parameter | Options | Default | Notes |
+|-----------|---------|---------|-------|
+| `--image` | File path (repeatable) | — | Up to 16 reference images. PNG/JPG/WEBP, <50 MB each. |
+| `--mask` | PNG file path | — | Alpha mask for inpainting. Requires `--image`. |
+| `--input-fidelity` | `high`, `low` | `low` | `high` preserves first image's details more closely. |
+
 ### Iteration
 
 Image generation is iterative. After every result, you can keep going:
@@ -210,6 +248,9 @@ Claude Code agents:
   generate.cjs      The CLI tool — works standalone, no dependencies
   SKILL.md          Claude Code skill definition (optional)
   reference.md      Style presets, prompt templates, cost tables
+examples/
+  skeleton-photo.jpg   Sample input photo
+  skeleton-16bit.png   Generated 16-bit pixel art from the photo
 ```
 
 ## Requirements

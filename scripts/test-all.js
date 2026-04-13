@@ -16,7 +16,7 @@ import { getPort } from './port.js';
 
 // ─── CONFIGURE: set your test commands ───────────────────────────────
 const UNIT_TEST_CMD = 'node tests/generate.test.js';
-const E2E_TEST_CMD = 'echo "E2E tests not applicable for this project"';
+const E2E_TEST_CMD = null; // No E2E tests for this CLI project
 const BUILD_TEST_CMD = 'echo "Build tests not applicable for this project"';
 
 const BOLD = '\x1b[1m';
@@ -92,31 +92,37 @@ const unitOk = run(
 );
 results.push({ name: 'Unit/integration', ok: unitOk });
 
-// 2. E2E tests (if dev server is up)
-const port = getPort();
-const serverUp = await checkPort(port);
-if (serverUp) {
-  const e2eOk = run(
-    `E2E Tests (${E2E_TEST_CMD})`,
-    E2E_TEST_CMD,
-    { timeout: 600_000 }
-  );
-  results.push({ name: 'E2E', ok: e2eOk });
-} else {
-  header(`E2E Tests (${E2E_TEST_CMD})`);
-  // Check if changed files would be covered by E2E tests
-  const e2eRelevant = hasChangedSourceFiles();
-  if (e2eRelevant) {
-    console.log(`${RED}x FAILED -- dev server not running on port ${port}, but source files changed:${RESET}`);
-    console.log(`  ${e2eRelevant.join(', ')}`);
-    console.log(`\n  E2E tests cannot be skipped when src/ files are modified.`);
-    console.log(`  Start the dev server and re-run tests.\n`);
-    results.push({ name: 'E2E', ok: false });
+// 2. E2E tests (if configured and dev server is up)
+if (E2E_TEST_CMD) {
+  const port = getPort();
+  const serverUp = await checkPort(port);
+  if (serverUp) {
+    const e2eOk = run(
+      `E2E Tests (${E2E_TEST_CMD})`,
+      E2E_TEST_CMD,
+      { timeout: 600_000 }
+    );
+    results.push({ name: 'E2E', ok: e2eOk });
   } else {
-    console.log(`${YELLOW}! SKIPPED -- dev server not running on port ${port} (no source files changed)${RESET}`);
-    console.log(`  Start the dev server to enable E2E tests.\n`);
-    results.push({ name: 'E2E', ok: null, skipped: true });
+    header(`E2E Tests (${E2E_TEST_CMD})`);
+    // Check if changed files would be covered by E2E tests
+    const e2eRelevant = hasChangedSourceFiles();
+    if (e2eRelevant) {
+      console.log(`${RED}x FAILED -- dev server not running on port ${port}, but source files changed:${RESET}`);
+      console.log(`  ${e2eRelevant.join(', ')}`);
+      console.log(`\n  E2E tests cannot be skipped when src/ files are modified.`);
+      console.log(`  Start the dev server and re-run tests.\n`);
+      results.push({ name: 'E2E', ok: false });
+    } else {
+      console.log(`${YELLOW}! SKIPPED -- dev server not running on port ${port} (no source files changed)${RESET}`);
+      console.log(`  Start the dev server to enable E2E tests.\n`);
+      results.push({ name: 'E2E', ok: null, skipped: true });
+    }
   }
+} else {
+  header('E2E Tests (not configured)');
+  console.log(`${YELLOW}! SKIPPED -- no E2E test command configured${RESET}\n`);
+  results.push({ name: 'E2E', ok: null, skipped: true });
 }
 
 // 3. Build/codegen tests (if prerequisites are met)

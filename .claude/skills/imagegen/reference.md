@@ -16,6 +16,9 @@ prompt templates, cost estimates, and advanced tips.
   with PNG output
 
 ### Limitations
+- **Reference image editing**: The `/v1/images/edits` endpoint inherits the same
+  transparent background bug as generations. The `quality` parameter on edits has
+  been intermittently unreliable (400 errors) — the script handles this gracefully.
 - **Pixel art is interpretive, not pixel-perfect**: The model generates 1024x1024
   images that *look like* pixel art but are not actual low-res pixel grids. For
   real game sprites, you may need to downscale and clean up output, or treat
@@ -204,11 +207,18 @@ Transparent background.
 Costs are approximate and subject to change. Check
 [OpenAI pricing](https://openai.com/api/pricing/) for current rates.
 
+**Generation** (`/v1/images/generations`):
+
 | Quality | Square (1024x1024) | Rectangular (1024x1536 / 1536x1024) |
 |---------|-------------------|--------------------------------------|
 | Low     | ~$0.011           | ~$0.014                              |
 | Medium  | ~$0.042           | ~$0.063                              |
 | High    | ~$0.167           | ~$0.250                              |
+
+**Editing** (`/v1/images/edits`) — same base price as generation, plus input
+image token costs. `--input-fidelity high` increases input token usage for the
+first image. For typical single-image edits, expect roughly the same cost as
+generation.
 
 ### Typical Session Costs
 
@@ -269,3 +279,13 @@ conversation context for iteration.
 7. **Specify colors by hex code for consistency.** "Using colors #3A7D44,
    #F2C94C, #EB5757" produces more consistent results across generations than
    "green, yellow, and red".
+
+8. **Use `--input-fidelity high` to preserve details.** When editing an image
+   and you want to keep faces, logos, or fine textures from the original,
+   pass `--input-fidelity high`. This costs more input tokens but produces
+   more faithful edits. Only the first `--image` benefits from high fidelity.
+
+9. **Chain edits for iterative refinement.** Feed the output of one generation
+   back as `--image` for the next. This refines the actual pixels, not just
+   the prompt — useful when the prompt alone can't capture what you want to
+   preserve from a previous result.
