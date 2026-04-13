@@ -189,8 +189,9 @@ If `$ARGUMENTS` contains `every <schedule>`:
    - `recurring`: true
    - `prompt`: the constructed command from step 3
 
-5. **Confirm** with wall-clock time. Show times in the user's local
-   timezone — use `date` for conversion, not raw UTC:
+5. **Confirm** with wall-clock time. **Always show times in America/New_York
+   (ET)** — use `TZ=America/New_York date` for conversion, not the system
+   timezone (which may be UTC):
 
    If `now` is present:
    > Run-plan scheduled every 4h. Running now.
@@ -244,6 +245,14 @@ Before parsing, check for stale state from a previous failed run:
    If worktrees from a previous run exist (paths containing `plan-`), warn
    the user. Do not remove them — note their presence and continue.
 
+4. **Unconfigured hook placeholders?**
+   ```bash
+   grep -q '{{' .claude/hooks/block-unsafe-project.sh 2>/dev/null
+   ```
+   If found AND test infrastructure exists (`package.json` with a `"test"`
+   script, or `vitest.config.*` / `jest.config.*` exists), **STOP.** Hook
+   placeholders have not been configured — run `/update-zskills` first.
+
 ### Parse plan
 
 1. **Read the plan file** in full. Also read any companion progress document
@@ -290,17 +299,29 @@ Before parsing, check for stale state from a previous failed run:
 
    **Do NOT summarize, paraphrase, or reinterpret.** The plan is the spec.
 
-   Past failure: summarized descriptions caused agents to implement the
-   wrong thing. "Reset button" was interpreted as "clear canvas" instead
-   of "reset mappings to defaults" because only the title was read.
+   Lesson from `/fix-issues` #387: summarized descriptions caused agents to
+   implement the wrong thing. "Reset button" was interpreted as "clear canvas"
+   instead of "reset mappings to defaults" because only the title was read.
    The same will happen with plan phases if the orchestrator summarizes
    "implement translational mechanical domain" without the formulas, state
    equations, and design constraints.
 
-8. **Classify UI impact from the plan text.** Scan the phase description
+8. **Create tracking fulfillment marker.** Determine the tracking ID: use
+   the ID passed by the parent skill if this is a delegated invocation, or
+   derive from the plan file slug if standalone (e.g., `FEATURE_PLAN.md` →
+   `feature-plan`). Then create the fulfillment file in the MAIN repo:
+   ```bash
+   MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+   mkdir -p "$MAIN_ROOT/.claude/tracking"
+   printf 'skill: run-plan\nid: %s\nplan: %s\nphase: %s\nstatus: started\ndate: %s\n' \
+     "$TRACKING_ID" "$PLAN_FILE" "$PHASE" "$(TZ=America/New_York date -Iseconds)" \
+     > "$MAIN_ROOT/.claude/tracking/fulfilled.run-plan.$TRACKING_ID"
+   ```
+
+9. **Classify UI impact from the plan text.** Scan the phase description
    for UI indicators: mentions of editor, toolbar, canvas, panel, dialog,
    CSS, button, menu, viewport, renderer, dark mode, layout, or any
-   reference to {{UI_FILE_PATTERNS}}.
+   reference to UI/editor/styles directories in the project.
    Flag the phase as **UI-touching** if any are found.
 
    In `finish` mode, classify ALL phases upfront and report:
@@ -480,6 +501,32 @@ agent hasn't returned after 2 hours, declare it **failed**:
    those exact tests. Do not stop after the easy items and declare the hard
    ones "future work."
 
+### Post-implementation tracking
+
+After the implementation agent finishes (whether worktree or delegate mode),
+create the implementation step marker:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'phase: %s\ncompleted: %s\n' "$PHASE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.run-plan.$TRACKING_ID.implement"
+```
+
+### Pre-verification tracking
+
+Before dispatching the verification agent, create a delegation requirement
+marker so the hook can enforce that verification actually runs:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'skill: verify-changes\nparent: run-plan\nid: %s\ndate: %s\n' \
+  "$TRACKING_ID" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/requires.verify-changes.$TRACKING_ID"
+```
+Pass the tracking ID to the verification agent in the dispatch prompt so it
+can create its own fulfillment marker:
+> Your tracking ID is `$TRACKING_ID`. On entry, create
+> `fulfilled.verify-changes.$TRACKING_ID` in the main repo's
+> `.claude/tracking/` directory.
+
 ## Phase 3 — Verify (separate agent)
 
 Critical: the verification agent is NOT the implementing agent. Fresh eyes
@@ -560,6 +607,15 @@ If this phase used delegate execution, verification runs on **main**:
      failing after 2 fix+verify cycles, **STOP** — needs human judgment.
      Invoke the Failure Protocol.
 
+### Post-verification tracking
+
+After verification passes, create the verification step marker:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'phase: %s\nresult: pass\ncompleted: %s\n' "$PHASE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.run-plan.$TRACKING_ID.verify"
+```
+
 ## Phase 4 — Update Progress Tracking
 
 After verification passes. **These updates happen on MAIN, not in the
@@ -596,36 +652,29 @@ to the next incomplete phase (preventing infinite loops).
 
 ## Phase 5 — Write Report
 
-**APPEND** a new phase section to `reports/plan-{slug}.md`, where `{slug}`
-is derived from the plan filename (e.g., `FEATURE_PLAN.md` → `plan-feature`).
-Each plan gets its own report file — different plans never collide.
-Re-running the same plan appends (multiple phases accumulate).
+**PREPEND** new phase sections after the H1 in `reports/plan-{slug}.md`
+(`{slug}` from plan filename, e.g., `FEATURE_PLAN.md` → `plan-physics module`).
+Newest phase at the top — the reader's question is "what needs my
+attention?" and that's always the newest phase.
 
 If the file doesn't exist, create it with a `# Plan Report — {plan name}`
-heading. Do NOT overwrite — `finish` and `every` modes add multiple phases.
+heading. Never overwrite the file — each phase adds a section.
 
 After writing, regenerate `PLAN_REPORT.md` in the repo root as an **index**
-of all plan reports (same pattern as VERIFICATION_REPORT.md index):
+of all plan reports:
 1. Scan `reports/plan-*.md` files
-2. For each: extract plan name, phase count, overall status, and count
-   unchecked `[ ]` sign-off items
-3. Write `PLAN_REPORT.md` with:
-   - **Needs Sign-off** section at top — all unchecked `[ ]` items across
-     all plan reports, linked to their source file
-   - **Plans** table — each plan report with status and action item count
-   - Staleness rule: items >7 days flagged STALE (same as VERIFICATION_REPORT.md)
+2. For each: extract plan name, phase count, overall status, unchecked `[ ]`
+3. Write index with Needs Sign-off section (linked items) + Plans table
+4. Staleness rule: items >7 days flagged STALE
 
-Past failure in `/fix-issues`: the sprint report was overwritten each run,
-losing 17 sprints of data. Same applies here — never overwrite.
-
-**Report format** — each phase appends a section:
+**Report format** — each phase gets one `## Phase` section:
 
 ```markdown
 ## Phase — 4b Translational Mechanical Domain [UNFINALIZED]
 
 **Plan:** plans/FEATURE_PLAN.md
 **Status:** Completed (verified)
-**Worktree:** ../plan-feature-4b
+**Worktree:** ../plan-physics module-4b
 **Commits:** abc1234, def5678
 
 ### Work Items
@@ -638,34 +687,121 @@ losing 17 sprints of data. Same applies here — never overwrite.
 - Test suite: PASSED (4342 tests)
 - Acceptance criteria: all met
 
-### User Verification
-{Only include this section if UI files were changed in this phase.
-If no UI files changed, omit the section entirely.}
+### User Sign-off
+{Only if UI files changed. Omit entirely for non-UI phases.}
 
-| Change | Agent Verify | User Verify |
-|--------|:-----------:|:----------:|
-| Variable viewer panel | ✅ | [ ] |
-| Toolstrip button | ✅ | [ ] |
+- [ ] **P4b-1** — Variable viewer panel
+  1. Open the app, load a physics module model (e.g., voltage-divider example)
+  2. Run the simulation
+  3. Click the lightning icon in the toolstrip
+  4. Verify the Physical Variables panel opens with columns for V, I, P
+  5. Check that values update after simulation completes
+  ![viewer panel](.playwright/output/phase4b-variable-viewer.png)
 
-### #1 — Variable viewer panel
-- [ ] **Sign off**
-
-1. Open the app, load a model (e.g., amplifier-circuit example)
-2. Run the simulation
-3. Click the lightning icon in the toolstrip
-4. Verify the Physical Variables panel opens with columns for V, I, P
-5. Check that values update after simulation completes
-
-![viewer panel](.playwright/output/phase4b-variable-viewer.png)
+- [ ] **P4b-2** — Toolstrip button
+  1. Verify the lightning icon appears in the toolstrip
+  2. Click it — panel should toggle open/closed
 ```
 
-**Conditional:** Only include the User Verification section if UI files
-({{UI_FILE_PATTERNS}}) were
-changed in this phase. If no UI files changed, omit the entire section.
+**Report format rules:**
+- **One checkbox per item.** Do NOT use a summary table with `[ ]` AND a
+  detail section with `[ ]` — the viewer counts both as separate checkboxes.
+  Use only the checklist format above.
+- **Phase-prefixed IDs** — `P4b-1`, `P2-3`, not `#1`, `#2` (which reset
+  per phase and collide).
+- **Include verification instructions** under each checkbox — numbered
+  steps, screenshots. The reviewer needs to know what to do, not just
+  what to check off.
+- **One item per verifiable thing** — "3 check blocks in Block Explorer"
+  is wrong. Each block gets its own checkbox.
+- **Avoid literal `[ ]` in description text** — the viewer renders it as
+  a phantom checkbox. Describe instead: "bracket pair" or use backtick
+  escaping.
 
-**Use actual data.** The H1 is `# Plan Report` — created once when the
-file doesn't exist. Each phase appends a `## Phase` section. Never create
-a new H1.
+### Post-report tracking
+
+After writing the report and regenerating the index, create the report step marker:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'phase: %s\ncompleted: %s\n' "$PHASE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.run-plan.$TRACKING_ID.report"
+```
+
+## Phase 5b — Plan Completion
+
+Triggers when ALL phases are done: either the last phase just finished
+(single-phase run where it was the only remaining phase), or in `finish`
+mode after all phases complete. Run this BEFORE Phase 6 (Land).
+
+### 1. Audit phase compliance
+
+Before declaring the plan complete, verify every phase has a clean status:
+
+1. **Check completion indicators** — every phase must have one of: Done,
+   a commit hash, ✅, `[x]`. If any phase lacks a completion indicator,
+   WARN (do not hard-block):
+   > Phase 3 has no completion indicator — review before closing.
+
+2. **Scan for unresolved gaps** — check each phase's status line AND its
+   corresponding section in `reports/plan-{slug}.md` for any of these
+   phrases (case-insensitive): "noted as gap", "deferred", "skipped",
+   "future work". If found, WARN (do not hard-block):
+   > Phase 3 has unresolved gaps — review before closing.
+
+   List all flagged phases together so the user can review in one pass.
+
+3. If running with `auto` and warnings were emitted, log them in the
+   report but continue — these are advisory, not blocking.
+
+### 2. Close linked issue (if any)
+
+If the plan file has YAML frontmatter with an `issue:` field (e.g.,
+`issue: 42` or `issue: "#42"`):
+
+1. **Check issue state:**
+   ```bash
+   gh issue view <N> --json state --jq '.state'
+   ```
+
+2. **If open:** close it with a summary comment listing key commits and
+   what was accomplished:
+   ```bash
+   gh issue close <N> --comment "Resolved via plan execution.
+
+   Plan: <plan-file>
+   Key commits: <comma-separated list of commit hashes from all phases>
+   Phases completed: <count>
+
+   All phases passed verification. See reports/plan-{slug}.md for details."
+   ```
+
+3. **If already closed:** no action needed — log "Issue #N already closed."
+
+4. **If no `issue:` field:** skip this step entirely.
+
+### 3. Update plan frontmatter
+
+Change `status: active` (or `status: in-progress`) to `status: complete`
+in the plan file's YAML frontmatter. If the plan has no `status:` field,
+add one: `status: complete`. Commit the change:
+```bash
+git add <plan-file>
+git commit -m "chore: mark plan complete — <plan-name>"
+```
+
+### 4. Update SPRINT_REPORT.md
+
+Check if `SPRINT_REPORT.md` exists in the repo root. If it does:
+
+1. Search for the closed issue number (from step 2) or the plan filename
+   in a "Skipped" section (look for headers or list items containing
+   "Skipped", "Too Complex", "Deferred", or "Punted").
+
+2. If found, append a note to that entry:
+   > Resolved via /run-plan (plan: <plan-file>)
+
+3. If `SPRINT_REPORT.md` does not exist, or the issue/plan is not
+   mentioned in a skipped section, skip this step.
 
 ## Phase 6 — Land
 
@@ -776,7 +912,7 @@ Before ANY cherry-pick to main, verify ALL of these. If any fails, STOP.
         ```bash
         cat > "<worktree-path>/.landed.tmp" <<LANDED
         status: full
-        date: $(date -Iseconds)
+        date: $(TZ=America/New_York date -Iseconds)
         source: run-plan
         phase: <phase name>
         commits: <list of cherry-picked hashes>
@@ -805,8 +941,62 @@ Before ANY cherry-pick to main, verify ALL of these. If any fails, STOP.
      ```
   10. **Update the plan report** (`reports/plan-{slug}.md`) — mark the
       phase section as landed. Regenerate `PLAN_REPORT.md` index.
-  11. Done. Worktree cleanup: worktrees with `status: full` in `.landed`
-      are safe to remove. See CLAUDE.md worktree cleanup rules.
+  11. **Auto-remove worktree** after successful landing:
+      ```bash
+      # Extract any remaining logs
+      if [ -d "<worktree>/.claude/logs" ]; then
+        for log in <worktree>/.claude/logs/*.md; do
+          [ -f ".claude/logs/$(basename "$log")" ] || cp "$log" .claude/logs/
+        done
+      fi
+
+      # Check for real uncommitted work (not artifacts)
+      DIRTY=$(git -C "<worktree>" diff --name-only HEAD)
+      UNTRACKED=$(git -C "<worktree>" status --porcelain | \
+        grep -v '\.landed\|\.worktreepurpose\|\.test-results\|\.playwright\|node_modules')
+
+      if [ -z "$DIRTY" ] && [ -z "$UNTRACKED" ]; then
+        rm -f "<worktree>/.landed" "<worktree>/.worktreepurpose" \
+              "<worktree>/.test-results.txt"
+        git worktree remove "<worktree>"
+        git branch -d "<branch>" 2>/dev/null
+      else
+        echo "Worktree not auto-removed: uncommitted work found"
+      fi
+      ```
+      If removal fails for any reason, leave the worktree — it has
+      `.landed` and `/briefing worktrees` will classify it as safe.
+
+### Post-landing tracking
+
+After successful landing (cherry-pick + tests pass), create the land step
+marker and update the fulfillment file:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'phase: %s\ncompleted: %s\n' "$PHASE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.run-plan.$TRACKING_ID.land"
+
+printf 'skill: run-plan\nid: %s\nplan: %s\nphase: %s\nstatus: complete\ndate: %s\n' \
+  "$TRACKING_ID" "$PLAN_FILE" "$PHASE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/fulfilled.run-plan.$TRACKING_ID"
+```
+
+In `finish` mode, per-phase markers use the `phasestep` prefix (the hook
+ignores these — they are informational only):
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'phase: %s\ncompleted: %s\n' "$PHASE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/phasestep.run-plan.$TRACKING_ID.$PHASE.implement"
+```
+After the cross-phase verification in `finish` mode completes, aggregate
+with `step.*` markers:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+for stage in implement verify report land; do
+  printf 'phases: all\ncompleted: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+    > "$MAIN_ROOT/.claude/tracking/step.run-plan.$TRACKING_ID.$stage"
+done
+```
 
 ## Failure Protocol
 
@@ -855,7 +1045,7 @@ Add a `## Run Failed` section at the top of the report:
 ## Run Failed — YYYY-MM-DD HH:MM
 
 **Plan:** plans/FEATURE_PLAN.md
-**Phase:** 4b — Implementation Phase
+**Phase:** 4b — Translational Mechanical Domain
 **Failed at:** Phase N — [description]
 **Error:** [what went wrong]
 **State:**

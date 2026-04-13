@@ -23,7 +23,14 @@
       "Bash(do node -c \"$file\")",
       "Bash(echo:*)",
       "Bash(xargs:*)",
-      "Bash(npx http-server:*)"
+      "Bash(npx http-server:*)",
+      "Bash(rm .claude/skills/setup-zskills/SKILL.md)",
+      "Bash(rmdir .claude/skills/setup-zskills)",
+      "Bash(cp /tmp/zskills/hooks/block-unsafe-project.sh.template .claude/hooks/block-unsafe-project.sh)",
+      "Bash(sed -i 's|{{UNIT_TEST_CMD}}|node tests/generate.test.js|g' .claude/hooks/block-unsafe-project.sh)",
+      "Bash(sed -i 's|{{FULL_TEST_CMD}}|npm run test:all|g' .claude/hooks/block-unsafe-project.sh)",
+      "Bash(sed -i 's|{{UI_FILE_PATTERNS}}|{{UI_FILE_PATTERNS}}|g' .claude/hooks/block-unsafe-project.sh)",
+      "Bash(chmod +x .claude/hooks/block-unsafe-project.sh)"
     ],
     "deny": []
   }

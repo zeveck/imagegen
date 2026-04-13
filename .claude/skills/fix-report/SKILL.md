@@ -127,7 +127,7 @@ For each issue with `User Verify: NEEDED`:
    - What to look at (specific UI element, panel, interaction)
    - Steps to reproduce (open app → navigate → interact → observe)
    - What "correct" looks like (expected appearance or behavior)
-   - URL: `http://localhost:$(node scripts/port.js)/`
+   - URL: `http://localhost:$(bash scripts/port.sh)/`
    - The user may be verifying hours later — "check the UI" is useless.
      Be specific: "Open the toolstrip, click the lightning icon, verify
      the Physical Variables panel opens with a table showing V, I, P
@@ -157,9 +157,9 @@ plan** — everything that will happen if approved:
 ```
 Ready to finalize:
   ✓ #123 — Solver crash (landed in abc1234)
-      → Close GH issue, update CORRECTNESS_PLAN + ISSUES_PLAN
+      → Close GH issue, update issue trackers
   ✓ #456 — Button misaligned (landed in def5678)
-      → Close GH issue, update ISSUES_PLAN
+      → Close GH issue, update issue trackers
 
 Not finalizing:
   ✗ #789 — Parser error (failed verification)
@@ -219,8 +219,8 @@ Present the batch and get confirmation:
 
 ```
 Closing and updating trackers for N issues:
-  #123 — close GH + mark [x] in ISSUES_PLAN, mark ~~FIXED~~ in CORRECTNESS_PLAN
-  #456 — close GH + mark [x] in ISSUES_PLAN
+  #123 — close GH + mark done in issue trackers
+  #456 — close GH + mark done in issue trackers
 
 Proceed?
 ```
@@ -235,13 +235,9 @@ Then for each approved issue:
    gh issue close <number> --comment "Fixed in <commit-hash>"
    ```
 
-2. Update ALL relevant plan files for that issue:
-   - `plans/ISSUES_PLAN.md` — `- [ ]` → `- [x]` with commit hash
-   - `plans/CORRECTNESS_ISSUES.md` — mark ~~FIXED~~
-   - `plans/BUILD_ISSUES.md` — mark ~~FIXED~~
-   - `plans/QE_ISSUES.md` — mark RESOLVED
-   - `plans/DOC_ISSUES.md`
-   - `plans/MODULE_ISSUES.md`
+2. Update ALL relevant issue tracker files — scan `plans/*ISSUES*.md`
+   for the issue number and mark it done (`[x]`, ~~FIXED~~, RESOLVED,
+   etc. — match the convention used in each file).
 
    Only update files that actually reference the issue number.
 
@@ -269,7 +265,7 @@ Worktrees:
   wt-123 — SAFE (status: full, landed 2026-03-16) ✓
   wt-456 — SAFE (status: full, landed 2026-03-16) ✓
   wt-789 — PARTIAL — skipped commits, needs review ⚠
-  feature-branch — ACTIVE — no .landed marker (long-running dev) ⚠
+  physics module-phase4 — ACTIVE — no .landed marker (long-running dev) ⚠
 
 Remove SAFE worktrees? (wt-123, wt-456)
 ```
@@ -286,7 +282,7 @@ git branch -d <branch-name>
 ## Step 7 — Write FIX_REPORT.md
 
 Write `FIX_REPORT.md` to the repo root. Viewable in the browser:
-`http://localhost:$(node scripts/port.js)/viewer/?file=FIX_REPORT.md`
+`http://localhost:$(bash scripts/port.sh)/viewer/?file=FIX_REPORT.md`
 
 ### Report structure
 
@@ -298,32 +294,26 @@ Legend: ✅ verified, ⚠️ partial, ❌ failed, ➖ not applicable, [ ] not ye
 ```
 
 **Domain-grouped sections** — group by concern (UI/UX, Codegen,
-Simulation, State Machine, etc.), NOT by workflow state. Each section has:
+Simulation, state machine module, etc.), NOT by workflow state. Use a single-checkbox
+checklist (no summary table + detail card dual-checkbox pattern):
 
-1. **Summary table** with navigation links to detail cards:
-   ```markdown
-   ## UI / UX Fixes
-   | # | Title | Unit | E2E | Manual | User |
-   |---|-------|:----:|:---:|:------:|:----:|
-   | [#358](#358--block-rotation) | Block Rotation | ✅ | ✅ | ✅ | [ ] |
-   ```
-   Columns are context-appropriate: swap E2E for Codegen in codegen
-   sections, use `Tests Added | Suite` for test coverage items.
+```markdown
+## UI / UX Fixes
 
-2. **Detail cards** — only for items with `[ ]` in User column:
-   ```markdown
-   ### #358 — Block Rotation
-   [↑ back to table](#ui--ux-fixes)
-   - [ ] **Sign off**
+- [ ] **#358** — Block Rotation
+  1. Right-click a block and select Rotate
+  2. Ports should move to the correct sides
+  3. Block label should stay horizontal
+  ![rotation](.playwright/output/358-rotation-90deg.png)
 
-   Right-click a block and select Rotate. Ports should move to the
-   correct sides and the block label should stay horizontal.
+- [ ] **#401** — Tooltip positioning
+  1. Hover near canvas edge
+  2. Verify tooltip doesn't clip off-screen
+```
 
-   ![90 degree rotation](.playwright/output/358-rotation-90deg.png)
-   ```
-   Each card: heading, back-link, checkbox (paired with table `[ ]`),
-   imperative verification instructions, screenshot(s) with
-   `{issue}-{slug}.png` naming. Omit cards for `➖` or `✅` items.
+**One checkbox per verifiable item.** Include verification steps and
+screenshots directly under each checkbox. One item per distinct thing —
+not "3 fixes in category" but one per fix.
 
 **Outcome sections** (after all domain sections, include only non-empty):
 - **Not Fixed** — issues referenced in commits but not actually fixed

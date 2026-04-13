@@ -54,6 +54,19 @@ based on session recall.
 
 Examples: `/verify-changes`, `/verify-changes worktree`, `/verify-changes last 3`
 
+## Tracking Fulfillment
+
+On entry, if a tracking ID was passed by the parent skill, create the
+fulfillment marker in the MAIN repo:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+mkdir -p "$MAIN_ROOT/.claude/tracking"
+printf 'skill: verify-changes\nid: %s\nscope: %s\nstatus: started\ndate: %s\n' \
+  "$TRACKING_ID" "$SCOPE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/fulfilled.verify-changes.$TRACKING_ID"
+```
+If no tracking ID was passed (standalone invocation), skip tracking.
+
 ## Phase 1 — Inventory Changes
 
 1. **Determine the diff scope** based on the argument:
@@ -92,21 +105,17 @@ For each changed file, verify appropriate tests exist:
    - If a bug fix: does a regression test exist that would have caught the bug?
    - If a new feature: do tests cover the happy path AND edge cases?
 
-2. **Block changes** (block implementation files):
-   - Check `tests/blocks/*.test.js` for runtime tests
-   - Verify output computation, parameter handling, edge cases
+2. **Component/module changes** — find corresponding test files and verify
+   output computation, parameter handling, edge cases are tested.
 
-3. **Solver/engine changes** (`src/simulation/`, `src/engine/`):
-   - Check analytical verification tests where applicable
-   - Verify numerical accuracy assertions (tolerances, convergence)
+3. **Engine/solver changes** — check analytical verification tests where
+   applicable. Verify numerical accuracy assertions (tolerances, convergence).
 
-4. **Codegen changes** (`src/codegen/`, `src/deploy/`):
-   - Verify codegen compile tests exist in `tests/codegen/`
-   - Check JS-to-Rust behavioral parity
+4. **Codegen/build changes** — verify compile tests exist. Check behavioral
+   parity between source and generated code.
 
-5. **UI/editor changes** ({{UI_FILE_PATTERNS}}):
-   - Check for E2E tests in `tests/e2e/`
-   - Flag for manual verification in Phase 4
+5. **UI/editor changes** — check for E2E tests. Flag for manual verification
+   in Phase 4.
 
 6. **Produce a coverage assessment:**
 
@@ -171,6 +180,16 @@ For each changed file, verify appropriate tests exist:
    | Suite | Result | Failures |
    |-------|--------|----------|
 
+### Post-tests tracking
+
+After recording test results (pass or fail), create the tests-run step
+marker if a tracking ID is present:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'result: %s\ncompleted: %s\n' "$TEST_RESULT" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.verify-changes.$TRACKING_ID.tests-run"
+```
+
 ## Phase 4 — Agent Verification + User Verification Classification
 
 Two types of verification — both are mandatory for UI changes:
@@ -183,8 +202,8 @@ the session when UI files are staged. This is not optional.
 **User verification (USER):** Some changes need the HUMAN to see them —
 judgment calls about animation quality, visual layout, UX feel. The agent
 flags these but cannot close them. Mechanically classified: if
-{{UI_FILE_PATTERNS}} files
-changed → `User Verify: NEEDED`. `/fix-report` Step 2 presents these to
+UI/editor/styles files changed → `User Verify: NEEDED`. `/fix-report`
+Step 2 presents these to
 the user before closing.
 
 ### Agent verification steps
@@ -228,10 +247,22 @@ have started one is skipping, not verifying.
    - What to look at (specific UI element, interaction, visual behavior)
    - How to reproduce (steps: open app, navigate to X, click Y, observe Z)
    - What "correct" looks like (expected appearance, behavior, output)
-   - URL: `http://localhost:$(node scripts/port.js)/`
+   - URL: `http://localhost:$(bash scripts/port.sh)/`
 
    The user may be verifying hours later in a different context. "NEEDED"
    without instructions is useless — the user won't know what to check.
+
+### Post-manual-verification tracking
+
+After completing agent verification (Phase 4), if UI changes were verified
+and a tracking ID is present, create the manual-verified step marker:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'ui_changes: true\ncompleted: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.verify-changes.$TRACKING_ID.manual-verified"
+```
+Only create this marker if UI files were actually verified in Phase 4. Skip
+for non-UI changes.
 
 ## Phase 5 — Fix Problems
 
@@ -322,30 +353,26 @@ Legend: ✅ verified, ⚠️ partial, ❌ failed, ➖ not applicable, [ ] not ye
 ```
 
 **Domain-grouped sections** — group by concern (UI/UX, Codegen, etc.),
-NOT by workflow state. Each section has:
+NOT by workflow state. Each section uses a single-checkbox checklist
+(no summary table + detail card dual-checkbox pattern):
 
-1. **Summary table** with navigation links to detail cards:
-   ```markdown
-   ## UI / UX Changes
-   | # | Title | Unit | E2E | Manual | User |
-   |---|-------|:----:|:---:|:------:|:----:|
-   | [#358](#358--block-rotation) | Block Rotation | ✅ | ✅ | ✅ | [ ] |
-   ```
-   Columns are context-appropriate per domain.
+```markdown
+## UI / UX Changes
 
-2. **Detail cards** — only for items with `[ ]` in User column:
-   ```markdown
-   ### #358 — Block Rotation
-   [↑ back to table](#ui--ux-changes)
-   - [ ] **Sign off**
+- [ ] **#358** — Block Rotation
+  1. Right-click a block and select Rotate
+  2. Ports should move to the correct sides
+  3. Block label should stay horizontal
+  ![rotation](.playwright/output/358-rotation-90deg.png)
 
-   Right-click a block and select Rotate. Ports should move to the
-   correct sides.
+- [ ] **#401** — Tooltip positioning
+  1. Hover near canvas edge
+  2. Verify tooltip doesn't clip off-screen
+```
 
-   ![rotation](.playwright/output/358-rotation-90deg.png)
-   ```
-   Each card: heading, back-link, paired checkbox, imperative
-   verification instructions, screenshot(s). Omit cards for `➖`/`✅`.
+**One checkbox per verifiable item.** Include verification steps and
+screenshots directly under each checkbox. One item per distinct thing
+to verify — not "3 blocks in explorer" but one per block.
 
 **Outcome sections** (include only non-empty):
 - **Skipped Verification** — per-item reason
@@ -398,6 +425,21 @@ re-verify or dismiss them.
 
 If there are no `reports/verify-*.md` files (e.g., all were cleaned up),
 write just the header and "No verification reports found."
+
+### Post-report tracking
+
+After writing the report (or confirming verification is clean), create the
+complete step marker and update the fulfillment file if a tracking ID is
+present:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'completed: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.verify-changes.$TRACKING_ID.complete"
+
+printf 'skill: verify-changes\nid: %s\nscope: %s\nstatus: complete\ndate: %s\n' \
+  "$TRACKING_ID" "$SCOPE" "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/fulfilled.verify-changes.$TRACKING_ID"
+```
 
 ## Key Rules
 

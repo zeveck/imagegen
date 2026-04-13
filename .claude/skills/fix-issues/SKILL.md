@@ -25,15 +25,11 @@ report, and optionally auto-lands to main. Can self-schedule for recurring runs.
 ```
 
 - **N** (required for sprints) — number of issues to fix (e.g., `30`)
-- **focus** (optional) — prioritize a specific domain:
-  - `new` — recently filed issues, user feedback (#382+)
-  - `correctness` — simulation/solver correctness (CORRECTNESS_PLAN)
-  - `codegen` — Rust code generation (BUILD_ISSUES)
-  - `statemachine` — state machine module (MODULE_ISSUES)
-  - `physics` — physics module (MODULE_ISSUES)
-  - `ui` — editor/canvas bugs
-  - `tests` — test gaps (QE_ISSUES)
-  - (omit for default priority order)
+- **focus** (optional) — prioritize a specific domain. The agent scans
+  `plans/*_ISSUES.md` and `plans/ISSUES_PLAN.md` to discover tracker files
+  and their domains. Common focus values: `new`, `correctness`, `codegen`,
+  `ui`, `tests` — but any domain found in your tracker files works.
+  Omit for default priority order.
 - **auto** (optional) — bypass confirmation gates for autonomous operation.
   Behavior depends on context:
   - **Sprints:** skip Phase 2 issue list approval, auto-land to main via
@@ -198,7 +194,7 @@ Issues that appear already fixed (N candidates):
 |---|-------|---------|----------|
 | #126 | Fcn block mapping | FIXED | SlxImporter.js:85, commit abc1234, 2 tests |
 | #191 | Block stubs | FIXED | All 4 blocks implemented, 12 tests pass |
-| #393 | Fcn codegen u(N) | FIXED | block-emitter.js step 8, commit def5678 |
+| #393 | Fcn codegen u(N) | FIXED | codegen emitter step 8, commit def5678 |
 | #200 | Some bug | LIKELY FIXED | Code changed but no regression test |
 
 Close 3 FIXED issues? (all / comma-separated numbers / none)
@@ -274,7 +270,16 @@ and drafts plans for all found issues.
    Wait for the user's selection before proceeding. If `auto`, skip this
    step and plan all of them.
 
-4. **For each selected issue**, dispatch `/draft-plan` with:
+4. **For each selected issue**, create a delegation requirement marker and
+   then dispatch `/draft-plan`:
+   ```bash
+   MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+   mkdir -p "$MAIN_ROOT/.claude/tracking"
+   printf 'skill: draft-plan\nparent: fix-issues\nissue: %s\ndate: %s\n' \
+     "$ISSUE_NUMBER" "$(TZ=America/New_York date -Iseconds)" \
+     > "$MAIN_ROOT/.claude/tracking/requires.draft-plan.$ISSUE_NUMBER"
+   ```
+   Then dispatch `/draft-plan` with:
    - The issue number and full body (`gh issue view <N> --json body`)
    - Any research blurb from the tracker files
    - Output path: `plans/{issue-slug}.md`
@@ -356,6 +361,25 @@ If `every` is NOT present, skip this phase entirely and proceed to Phase 1
 
 ## Phase 1 — Preflight & Sync
 
+**IMPORTANT: Complete ALL steps (1-6 + Phase 1b) before Phase 2.** Do NOT
+skip tracker updates or research to "save time." Dispatching agents without
+research blurbs causes misinterpretation — agents guess from titles and
+implement the wrong fix. This has happened repeatedly.
+
+### Sprint tracking sentinel
+
+When mode is sprint (N provided), create the pipeline sentinel before
+doing anything else:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+mkdir -p "$MAIN_ROOT/.claude/tracking"
+if [ ! -f "$MAIN_ROOT/.claude/tracking/pipeline.active" ]; then
+  printf 'skill: fix-issues\nmode: sprint\ncount: %s\nfocus: %s\nstartedAt: %s\n' \
+    "$N" "${FOCUS:-default}" "$(TZ=America/New_York date -Iseconds)" \
+    > "$MAIN_ROOT/.claude/tracking/pipeline.active"
+fi
+```
+
 ### Preflight checks (before doing anything else)
 
 Before starting the sprint, check for stale state from a previous failed run:
@@ -407,13 +431,12 @@ alert user, write failure to report).
    node ${CLAUDE_SKILL_DIR}/scripts/issue-stats.js
    ```
 
-4. **Update ALL issue trackers** — ensure these files reflect current GitHub state:
-   - `plans/ISSUES_PLAN.md` (master index)
-   - `plans/CORRECTNESS_ISSUES.md` (correctness defects)
-   - `plans/BUILD_ISSUES.md` (codegen issues)
-   - `plans/QE_ISSUES.md` (test gaps)
-   - `plans/DOC_ISSUES.md` (documentation)
-   - `plans/MODULE_ISSUES.md` (module-specific features)
+4. **Update ALL issue trackers** — scan `plans/` for tracker files:
+   ```bash
+   ls plans/*ISSUES*.md plans/ISSUES_PLAN.md 2>/dev/null
+   ```
+   Ensure each tracker reflects current GitHub state. Add new issues to
+   the appropriate tracker based on domain.
 
 5. **Identify gaps** — any GH issues not tracked in any plan file? Add them to
    the appropriate tracker.
@@ -446,9 +469,7 @@ alert user, write failure to report).
 
 2. **Fetch the research blurb from plan files:**
    ```bash
-   grep -A 30 '#<N>' plans/ISSUES_PLAN.md plans/CORRECTNESS_ISSUES.md \
-     plans/BUILD_ISSUES.md plans/QE_ISSUES.md \
-     plans/MODULE_ISSUES.md plans/DOC_ISSUES.md 2>/dev/null
+   grep -A 30 '#<N>' plans/*ISSUES*.md 2>/dev/null
    ```
    Plan blurbs contain root cause analysis, affected files, suggested fixes,
    and effort estimates. This context was gathered when the issue was filed —
@@ -465,6 +486,15 @@ For each candidate, note:
 - Suggested fix approach (from plan blurb)
 - Context metadata (model name, browser, screen size)
 
+### Post-preflight tracking
+
+After Phase 1 (preflight + sync + research) is complete:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'completed: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.fix-issues.sprint.preflight"
+```
+
 ## Phase 2 — Prioritize
 
 Present the next N issues to fix as a ranked table:
@@ -477,11 +507,11 @@ top, then the remaining slots filled by default priority.
 
 **Default ranking criteria (in order):**
 1. New issues not yet attempted (user feedback, recently filed)
-2. Correctness defects (CORRECTNESS_ISSUES.md)
+2. Correctness defects (from issue trackers tagged as correctness)
 3. Critical/high severity bugs
 4. Quick wins (15 min – 1 hour)
 5. Issues with clear repro steps
-6. Test gaps (QE_ISSUES.md)
+6. Test gaps (from issue trackers tagged as test quality)
 
 ### Triage: vague, complex, or interrelated issues
 
@@ -524,6 +554,15 @@ Before dispatching agents, check for interrelated issues:
 Tell the agent when issues are related: "Issues #100 and #101 share
 root cause X in file Y — consider fixing them together with a single commit."
 
+**Bundling beyond N.** When prioritizing, if additional open issues would
+naturally be fixed in the same session (same component, same area of code)
+or appear to have the same root cause, the orchestrator should include
+them alongside the selected issue for the same agent. These don't count
+toward N. In interactive mode, show bundled extras in the approval list
+with the rationale so the user can adjust. This keeps `/fix-issues 1
+every 1h` efficient — one agent, one worktree, but it picks up tightly
+coupled neighbors instead of leaving them for the next sprint.
+
 ### Present the list
 
 - **Without `auto`:** **Wait for user approval** of the list before proceeding.
@@ -555,6 +594,15 @@ If ALL candidates are too vague, too complex, or already attempted:
      are expected." Do NOT auto-stop — that's the user's call.
    - **Exit.** Skip Phases 3-6.
 
+### Post-prioritize tracking
+
+After Phase 2 (prioritize) is complete:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'completed: %s\nissueCount: %d\n' "$(TZ=America/New_York date -Iseconds)" "$ISSUE_COUNT" \
+  > "$MAIN_ROOT/.claude/tracking/step.fix-issues.sprint.prioritize"
+```
+
 ## Phase 3 — Execute (agent teams in worktrees)
 
 **1 issue per agent, parallel dispatch.** Each issue gets its own agent
@@ -584,11 +632,10 @@ agent hasn't returned after 1 hour, declare it **failed**:
 1. **The verbatim issue body** from Phase 1b (`gh issue view`). Do NOT
    paraphrase or summarize — include the full text the user wrote. Titles are
    often vague; the body is the spec. If the body is empty, say so explicitly.
-2. **The research blurb from the plan file** (ISSUES_PLAN.md,
-   CORRECTNESS_ISSUES.md, BUILD_ISSUES.md, QE_ISSUES.md, etc.).
+2. **The research blurb from issue tracker files** (`plans/*ISSUES*.md`).
    These contain root cause analysis, affected files, suggested fixes, and
-   effort estimates written when the issue was filed. Grep the plan files for
-   the issue number and include any matching section verbatim.
+   effort estimates written when the issue was filed. Grep the tracker files
+   for the issue number and include any matching section verbatim.
 
 The agent should have everything it needs to understand the problem without
 re-researching from scratch. Missing context = wrong fix.
@@ -609,8 +656,8 @@ Each agent follows this fix workflow:
    use playwright-cli with real events, take screenshots as evidence.
    The pre-commit hook will BLOCK your commit if UI files are staged
    but `playwright-cli` wasn't used in the session. This is not optional.
-7. **Classify User Verify** — if {{UI_FILE_PATTERNS}} files changed,
-   mark `User Verify: NEEDED`
+7. **Classify User Verify** — if any UI/editor/styles files changed
+   (check your project's UI directories), mark `User Verify: NEEDED`
    in the sprint report. The user must see UI changes before the issue
    can be closed. This is in ADDITION to your agent verification.
 8. Commit in the worktree (one issue per commit, clean history)
@@ -626,7 +673,27 @@ Each agent follows this fix workflow:
 Agents commit freely in worktrees — that's the point of isolation. Worktree
 commits are safe and expected. The approval gate is landing to main (Phase 6).
 
+### Post-execute tracking
+
+After Phase 3 (execute) is complete — all agents have returned:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'completed: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.fix-issues.sprint.execute"
+```
+
 ## Phase 4 — Review
+
+### Pre-verification tracking
+
+Before dispatching verification agents, create a delegation requirement
+marker so the hook can enforce that verification actually runs:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'skill: verify-changes\nparent: fix-issues\nmode: sprint\ndate: %s\n' \
+  "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/requires.verify-changes.sprint"
+```
 
 After each agent completes, **dispatch a fresh agent** to run `/verify-changes
 worktree` in its worktree. Do NOT run verification yourself — you wrote
@@ -637,6 +704,15 @@ This delegates the full review workflow (diff review, test coverage audit,
 test run, manual verification, fix & re-verify cycle) to a separate agent.
 
 Report the review results to the user.
+
+### Post-verify tracking
+
+After Phase 4 (verify) is complete — all verification agents have returned:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'completed: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.fix-issues.sprint.verify"
+```
 
 ## Phase 5 — Write Sprint Report (BEFORE landing)
 
@@ -673,8 +749,8 @@ each sprint, losing results from earlier sprints that were never reviewed.
 The pre-commit hook blocks commits without test evidence.
 
 **User Verify:** Does the user need to see this? Mechanically classified:
-if {{UI_FILE_PATTERNS}}
-files changed → `NEEDED`. Otherwise → `N/A`. `/fix-report` Step 2
+if any UI/editor/styles files changed → `NEEDED`. Otherwise → `N/A`.
+`/fix-report` Step 2
 presents all `NEEDED` items for user review before closing.
 
 ### Skipped — Too Vague (need repro steps or clearer spec)
@@ -699,6 +775,15 @@ The file starts with `# Sprint Report` (created once). Each sprint
 appends a new `## Sprint` section. `/fix-report` marks sections
 `[FINALIZED]` after review. **Use actual data** — real issue numbers,
 commit hashes, worktree paths, and test counts.
+
+### Post-report tracking
+
+After Phase 5 (report) is complete:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'completed: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.fix-issues.sprint.report"
+```
 
 ## Phase 6 — Land
 
@@ -810,8 +895,44 @@ commit hashes, worktree paths, and test counts.
      code on main with the cron still running.
   9. **Update `SPRINT_REPORT.md`** — mark which fixes were landed (add a
      `Landed` column or update status).
-  10. Done. Closing GH issues, updating trackers, and cleaning worktrees are
-     still `/fix-report` actions — even in auto mode.
+  10. **Auto-remove fully landed worktrees** — for each worktree with
+      `status: full` in `.landed`:
+      ```bash
+      # Logs already extracted in step 5a. Double-check for stragglers:
+      if [ -d "<worktree>/.claude/logs" ]; then
+        for log in <worktree>/.claude/logs/*.md; do
+          [ -f ".claude/logs/$(basename "$log")" ] || cp "$log" .claude/logs/
+        done
+      fi
+
+      # Check for real uncommitted work (not artifacts)
+      DIRTY=$(git -C "<worktree>" diff --name-only HEAD)
+      UNTRACKED=$(git -C "<worktree>" status --porcelain | \
+        grep -v '\.landed\|\.worktreepurpose\|\.test-results\|\.playwright\|node_modules')
+
+      if [ -z "$DIRTY" ] && [ -z "$UNTRACKED" ]; then
+        rm -f "<worktree>/.landed" "<worktree>/.worktreepurpose" \
+              "<worktree>/.test-results.txt"
+        git worktree remove "<worktree>"
+        git branch -d "<branch>" 2>/dev/null
+      else
+        echo "Worktree <name> not auto-removed: uncommitted work found"
+      fi
+      ```
+      Skip removal for worktrees with `status: partial` — those have
+      unapplied commits that need attention.
+
+  11. Done. Closing GH issues and updating trackers are still `/fix-report`
+      actions — even in auto mode.
+
+### Post-land tracking
+
+After Phase 6 (land) is complete:
+```bash
+MAIN_ROOT=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
+printf 'completed: %s\n' "$(TZ=America/New_York date -Iseconds)" \
+  > "$MAIN_ROOT/.claude/tracking/step.fix-issues.sprint.land"
+```
 
 ## Failure Protocol
 
