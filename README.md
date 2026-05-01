@@ -10,6 +10,21 @@ asset organization — but the CLI works anywhere Node.js runs.
 
 Zero external dependencies. Just Node.js and an API key.
 
+## Choosing a Skill
+
+`imagegen` is one of three sibling image-generation skills. They are not
+interchangeable; each one exposes different strengths from its underlying API.
+
+| Skill | Back end | Good fit | Tradeoffs |
+|-------|----------|----------|-----------|
+| `imagegen` | OpenAI `gpt-image-1` | Classic game assets, direct transparent PNG/WebP sprites and icons | Older OpenAI image model, legacy size set |
+| [`imagegen2`](https://github.com/zeveck/imagegen2) | OpenAI `gpt-image-2` | Current OpenAI image path, flexible sizes up to 4K-class outputs, high-fidelity edits | No native transparent backgrounds; uses an explicit `gpt-image-1.5` fallback only when requested |
+| [`nanogen`](https://github.com/zeveck/nanogen) | Google Gemini / Nano Banana image models | Rich style catalog, natural-language edits, multi-image composition, multi-turn refinement | No native alpha output; often returns JPEG and uses chromakey/post-processing for transparent-style assets |
+
+Use `imagegen` when real alpha output matters. `gpt-image-1` supports
+`background: "transparent"` for PNG/WebP, though fine white/light subject
+details can still need prompt care and occasional retries.
+
 ## Quick Start
 
 ### 1. Get an OpenAI API Key
@@ -62,6 +77,32 @@ environment variable in your shell.
 ```
 /imagegen a pixel art treasure chest with gold coins, transparent
 ```
+
+## Benchmark Gallery
+
+These outputs use the prompts in [examples/prompts.md](examples/prompts.md).
+The prompt set is shared with `imagegen2` where practical so users can compare
+model behavior by category rather than by marketing copy.
+
+| Sprite | Item icon | Tactical unit |
+|:------:|:---------:|:-------------:|
+| <img src="examples/images/cat-tophat.png" width="220" alt="32-bit pixel art tuxedo cat wearing a top hat"> | <img src="examples/images/health-potion.png" width="220" alt="Pixel art health potion bottle"> | <img src="examples/images/tactical-knight.png" width="220" alt="Isometric tactical RPG knight sprite"> |
+
+| Terrain tile | UI icon | Background |
+|:------------:|:-------:|:----------:|
+| <img src="examples/images/isometric-grass-tile.png" width="220" alt="Isometric pixel art grass terrain tile"> | <img src="examples/images/settings-icon.png" width="220" alt="Flat vector settings gear icon"> | <img src="examples/images/forest-background.png" width="320" alt="Hand-painted fantasy forest background"> |
+
+Native transparent output is one of this skill's main advantages:
+
+| Opaque prompt | Transparent PNG |
+|:-------------:|:---------------:|
+| <img src="examples/images/cat-tophat.png" width="260" alt="Opaque-background pixel art cat with top hat"> | <img src="examples/images/cat-tophat-transparent.png" width="260" alt="Transparent-background pixel art cat with top hat"> |
+
+Reference-image edit:
+
+| Input photo | Generated 16-bit pixel art |
+|:-----------:|:--------------------------:|
+| <img src="examples/images/skeleton-photo.jpg" height="360" alt="Photo of a large skeleton decoration in snow and holiday lights"> | <img src="examples/images/skeleton-16bit-gpt-image-1.png" height="360" alt="gpt-image-1 16-bit pixel art skeleton example"> |
 
 ## Usage
 
