@@ -1,5 +1,11 @@
 # imagegen — Classic game art generation
 
+> **This project no longer works and is archived.** OpenAI shut down
+> `gpt-image-1`, the only model it uses, on 2026-10-23. Use
+> [imagegen2](https://github.com/zeveck/imagegen2) instead: same idea, current
+> OpenAI GPT Image models, native transparent sprites, and a
+> [migration guide](https://github.com/zeveck/imagegen2/blob/main/docs/migration-from-imagegen.md).
+
 Generate game assets from your terminal or AI agent — sprites, tiles, UI
 elements, portraits, concept art — using OpenAI's `gpt-image-1` model.
 
